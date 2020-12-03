@@ -82,24 +82,31 @@
 
 (defgeneric json-to-clos (input class &rest initargs))
 
-(defmethod json-to-clos ((input hash-table) class &rest initargs)
-  (let ((lisp-object (apply #'make-instance class initargs))
-        (key-count 0))
-    (loop for slot in (closer-mop:class-direct-slots (find-class class))
-          do (awhen (json-key-name slot)
-               (handler-case
-                   (progn
-                     (setf (slot-value lisp-object
-                                       (closer-mop:slot-definition-name slot))
-                           (to-lisp-value (gethash it input :null)
-                                          (json-type slot)))
-                     (incf key-count))
-                 (null-value (condition)
-                   (declare (ignore condition)) nil))))
-    (when (zerop key-count) (warn 'no-values-parsed
-                                  :hash-table input
-                                  :class-name class))
-    (values lisp-object key-count)))
+(let ((%lisp-object% nil))
+
+  (eval-when (:compile-toplevel :load-toplevel :execute)
+    (defun lisp-object ()
+      %lisp-object%))
+
+  (defmethod json-to-clos ((input hash-table) class &rest initargs)
+    (setq %lisp-object% (apply #'make-instance class initargs))
+    (let ((lisp-object (lisp-object))
+          (key-count 0))
+      (loop for slot in (closer-mop:class-direct-slots (find-class class))
+	 do (awhen (json-key-name slot)
+              (handler-case
+                  (progn
+                    (setf (slot-value lisp-object
+                                      (closer-mop:slot-definition-name slot))
+                          (to-lisp-value (gethash it input :null)
+					 (json-type slot)))
+                    (incf key-count))
+		(null-value (condition)
+                  (declare (ignore condition)) nil))))
+      (when (zerop key-count) (warn 'no-values-parsed
+                                    :hash-table input
+                                    :class-name class))
+      (values lisp-object key-count))))
 
 (defmethod json-to-clos ((input stream) class &rest initargs)
   (apply #'json-to-clos
