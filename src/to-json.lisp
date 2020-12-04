@@ -61,6 +61,7 @@
 
 (defmethod to-json-value (value (json-type (eql :bool)))
   "Return the boolean true"
+  (declare (ignore value))
   'true)
 
 (defmethod to-json-value ((value null) (json-type (eql :bool)))
@@ -111,16 +112,19 @@
                    &optional (stream *standard-output*))
   (with-output (stream)
     (with-object ()
-      (loop for slot in (closer-mop:class-direct-slots (class-of object))
-            do (awhen (json-key-name slot)
-                 (handler-case
-                     (encode-object-element
-                      it
-                      (to-json-value
-                       (slot-value object (closer-mop:slot-definition-name slot))
-                       (json-type slot)))
-                   (unbound-slot (condition)
-                     (declare (ignore condition))
-                     (when *encode-unbound-slots*
-                       (encode-object-element it nil))))))))
+      (loop for class in (closer-mop:class-precedence-list (class-of object))
+            do
+	       (loop for slot in (closer-mop:class-direct-slots class)
+                     when (typep slot 'json-serializable-slot)
+                       do (awhen (json-key-name slot)
+			    (handler-case
+				(encode-object-element
+				 it
+				 (to-json-value
+				  (slot-value object (closer-mop:slot-definition-name slot))
+				  (json-type slot)))
+			      (unbound-slot (condition)
+				(declare (ignore condition))
+				(when *encode-unbound-slots*
+				  (encode-object-element it nil)))))))))
   object)

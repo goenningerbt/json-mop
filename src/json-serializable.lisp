@@ -1,4 +1,4 @@
-;; Copyright (c) 2016 Grim Schjetne
+;; Copyright (c) 2015 Grim Schjetne
 ;;
 ;; Permission is hereby granted, free of charge, to any person
 ;; obtaining a copy of this software and associated documentation
@@ -20,24 +20,6 @@
 ;; CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ;; SOFTWARE.
 
-(asdf:defsystem #:json-mop
-    :description "A metaclass for bridging CLOS and JSON"
-  :author "Grim Schjetne"
-  :license "MIT"
-  :depends-on (#:closer-mop
-               #:yason
-               #:anaphora)
-  :serial t
-  :components ((:module "src"
-                :serial t
-                :components
-                ((:file "package")
-                 (:file "conditions")
-                 (:file "json-mop")
-		 (:file "json-serializable")
-                 (:file "to-lisp")
-                 (:file "to-json")))))
+(in-package #:json-mop)
 
-(defmethod perform ((o load-op) (c (eql (find-system :json-mop))))
-  (format *debug-io* "~&;; Loaded frgo's special version of json-mop ...~%")
-  (pushnew :json-mop *features*))
+(defclass json-serializable () ())

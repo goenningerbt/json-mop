@@ -80,6 +80,17 @@
   "Return the CLOS object VALUE"
   (json-to-clos value json-type))
 
+(declaim (inline json-serializable-slots))
+(defun json-serializable-slots (class)
+  (let ((resulting-slot-list (list)))
+    (loop for the-class in (closer-mop:class-precedence-list (find-class class))
+	  do
+	     (loop for slot in (closer-mop:class-direct-slots the-class)
+		   when (typep slot 'json-serializable-slot)
+		     do
+			(push slot resulting-slot-list)))
+    resulting-slot-list))
+
 (defgeneric json-to-clos (input class &rest initargs))
 
 (let ((%lisp-object% nil))
@@ -92,20 +103,22 @@
     (setq %lisp-object% (apply #'make-instance class initargs))
     (let ((lisp-object (lisp-object))
           (key-count 0))
-      (loop for slot in (closer-mop:class-direct-slots (find-class class))
-	 do (awhen (json-key-name slot)
-              (handler-case
-                  (progn
-                    (setf (slot-value lisp-object
-                                      (closer-mop:slot-definition-name slot))
-                          (to-lisp-value (gethash it input :null)
-					 (json-type slot)))
-                    (incf key-count))
-		(null-value (condition)
-                  (declare (ignore condition)) nil))))
-      (when (zerop key-count) (warn 'no-values-parsed
-                                    :hash-table input
-                                    :class-name class))
+      (loop for slot in (json-serializable-slots class)
+	    when (typep slot 'json-serializable-slot)
+	      do (awhen (json-key-name slot)
+		   (handler-case
+		       (progn
+			 (setf (slot-value lisp-object
+					   (closer-mop:slot-definition-name slot))
+			       (to-lisp-value (gethash it input :null)
+					      (json-type slot)))
+			 (incf key-count))
+		     (null-value (condition)
+		       (declare (ignore condition)) nil))))
+      (when (zerop key-count)
+	(warn 'no-values-parsed
+              :hash-table input
+              :class-name class))
       (values lisp-object key-count))))
 
 (defmethod json-to-clos ((input stream) class &rest initargs)

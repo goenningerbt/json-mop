@@ -38,16 +38,26 @@
               :initform :any
               :reader json-type)))
 
+(defparameter *warn-slot-not-serializable* nil)
 (defmethod json-key-name ((slot closer-mop:standard-direct-slot-definition))
-  (warn 'slot-not-serializable
-        :slot-name (closer-mop:slot-definition-name slot)))
+  (when *warn-slot-not-serializable*
+    (warn 'slot-not-serializable
+          :slot-name (closer-mop:slot-definition-name slot))))
+
+
 
 (defmethod closer-mop:direct-slot-definition-class ((class json-serializable-class)
                                                     &rest initargs)
   (declare (ignore class initargs))
   (find-class 'json-serializable-slot))
 
-(defclass json-serializable () ())
+;; (defmethod closer-mop:compute-class-precedence-list ((class json-serializable-class))
+;;   (cons (find-class 'json-serializable) (call-next-method class)))
 
-(defmethod closer-mop:compute-class-precedence-list ((class json-serializable-class))
-  (cons (find-class 'json-serializable) (call-next-method class)))
+(defmethod initialize-instance :around ((class json-serializable-class)
+                                        &rest rest &key direct-superclasses)
+  (apply #'call-next-method
+         class
+         :direct-superclasses
+         (append direct-superclasses (list (find-class 'json-serializable)))
+         rest))
